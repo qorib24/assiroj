@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi Guru</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Inisialisasi Firebase -->
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDrYGpzacOaRjgaUWn7E3GsU2P-6748XI0",
+    authDomain: "absensi-7c374.firebaseapp.com",
+    databaseURL: "https://absensi-7c374-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "absensi-7c374",
+    storageBucket: "absensi-7c374.appspot.com",
+    messagingSenderId: "429781474851",
+    appId: "1:429781474851:web:ab11a406500c3be0df9b96",
+    measurementId: "G-Y88MJJ0F3N"
+  };
+
+  // Inisialisasi Firebase (pakai compat SDK)
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const database = firebase.database();
+</script>
+
+    <style>
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+            <div class="loading-spinner"></div>
+            <span id="loadingText">Memuat...</span>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="bg-blue-600 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <img src="YAYASAN.jpg" alt="Logo Yayasan" class="w-8 h-8 rounded-full mr-3">
+<h1 class="text-white text-xl font-bold">Sistem Absensi Guru</h1>
+                </div>
+                <div id="userInfo" class="flex items-center space-x-4 text-white text-sm hidden">
+    <span id="userName" class="font-semibold">Loading...</span>
+    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded transition-colors shadow">
+        <i class="fas fa-sign-out-alt mr-1"></i>Keluar
+    </button>
+</div>
+
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+            <div class="text-center mb-8">
+                <i class="fas fa-user-graduate text-blue-600 text-4xl mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-900">Login Guru</h2>
+                <p class="text-gray-600 mt-2">Masuk untuk melakukan absensi</p>
+            </div>
+            
+            <form id="loginForm">
+                <div class="mb-4">
+  <label class="block text-gray-700 text-sm font-bold mb-2">Nama Lengkap</label>
+  <input type="text" id="loginNama" required 
+         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+</div>
+
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="loginEmail" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="loginPassword" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                </div>
+                <button type="submit" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Masuk
+                </button>
+            </form>
+            <div id="loginError" class="mt-4 text-red-600 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="hidden">
+        <!-- Tab Navigation -->
+        <div class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex space-x-8">
+                    <button id="absensiTab" class="tab-button active py-4 px-2 border-b-2 border-blue-500 text-blue-600 font-medium">
+                        <i class="fas fa-clock mr-2"></i>Absensi
+                    </button>
+                    <button id="izinTab" class="tab-button py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-file-medical mr-2"></i>Izin/Sakit
+                    </button>
+                    <button id="adminTab" class="tab-button py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-users-cog mr-2"></i>Dashboard Admin
+                    </button>
+                    <button id="gajiTab" onclick="switchTab('gaji')" class="tab-button py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+  <i class="fas fa-money-bill-wave mr-2"></i>Gaji Guru
+</button>
+
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Absensi Tab Content -->
+        <div id="absensiContent" class="tab-content">
+            <div class="max-w-4xl mx-auto p-4">
+                <!-- Location Status -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-map-marker-alt mr-2 text-red-500"></i>Status Lokasi
+                    </h3>
+                    <div id="locationStatus" class="text-gray-600">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>Mengecek lokasi...
+                    </div>
+                    <div id="coordinatesInfo" class="mt-2 text-sm text-gray-500"></div>
+                </div>
+
+                <!-- Attendance Status Today -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-calendar-day mr-2 text-blue-500"></i>Status Hari Ini
+                    </h3>
+                    <div id="todayStatus" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="text-center p-4 border rounded-lg">
+                            <div class="text-sm text-gray-600">Check-in</div>
+                            <div id="checkinTime" class="text-lg font-semibold">Belum absen</div>
+                            <div id="checkinStatus" class="text-sm"></div>
+                        </div>
+                        <div class="text-center p-4 border rounded-lg">
+                            <div class="text-sm text-gray-600">Check-out</div>
+                            <div id="checkoutTime" class="text-lg font-semibold">Belum absen</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendance Buttons -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="checkinBtn" 
+    onclick="getUserLocation('checkin')"
+    class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+    <i class="fas fa-sign-in-alt mr-2"></i>
+    <span>Check-in (Masuk)</span>
+</button>
+
+                        <button id="checkoutBtn" 
+    onclick="getUserLocation('checkout')"
+    class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+    <i class="fas fa-sign-out-alt mr-2"></i>
+    <span>Check-out (Pulang)</span>
+</button>
+
+                    </div>
+                    <div id="attendanceMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Izin/Sakit Tab Content -->
+        <div id="izinContent" class="tab-content hidden">
+            <div class="max-w-2xl mx-auto p-4">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-6">
+                        <i class="fas fa-file-medical mr-2 text-orange-500"></i>Formulir Izin/Sakit
+                    </h3>
+                    
+                    <form id="leaveForm">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Tipe Pengajuan</label>
+                            <select id="leaveType" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                                <option value="izin">Izin</option>
+                                <option value="sakit">Sakit</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Tanggal Mulai</label>
+                            <input type="date" id="leaveStartDate" required 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Tanggal Selesai</label>
+                            <input type="date" id="leaveEndDate" required 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Alasan</label>
+                            <textarea id="leaveReason" rows="4" required 
+                                      placeholder="Jelaskan alasan izin/sakit Anda..."
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"></textarea>
+                        </div>
+                        
+                        <button type="submit" 
+                                class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                            <i class="fas fa-paper-plane mr-2"></i>Kirim Pengajuan
+                        </button>
+                    </form>
+                    
+                    <div id="leaveMessage" class="mt-4 p-3 rounded-lg hidden"></div>
+                </div>
+
+                <!-- My Leave Requests -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-list mr-2 text-blue-500"></i>Riwayat Pengajuan Saya
+                    </h3>
+                    <div id="myLeaveRequests">
+                        <p class="text-gray-500 text-center py-4">Memuat data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard Tab Content -->
+        <div id="adminContent" class="tab-content hidden">
+            <div class="max-w-7xl mx-auto p-4">
+                <!-- Filters -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-filter mr-2 text-purple-500"></i>Filter Data
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Tanggal</label>
+                            <input type="date" id="filterDate" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Nama Guru</label>
+                            <input type="text" id="filterTeacher" placeholder="Cari nama guru..." 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="refreshDataBtn" 
+                                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors">
+                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendance Data -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-table mr-2 text-green-500"></i>Data Absensi
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full table-auto">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Check-in</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Check-out</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">Memuat data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Leave Requests -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-clipboard-list mr-2 text-orange-500"></i>Permintaan Izin/Sakit
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full table-auto">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipe</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Periode</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Alasan</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tanggal Kirim</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaveRequestsTableBody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">Memuat data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Tab Gaji Guru -->
+<div id="gajiContent" class="tab-content hidden">
+  <div class="max-w-7xl mx-auto p-4">
+    <h2 class="text-xl font-bold mb-4">Fitur Gaji Guru</h2>
+
+    <!-- Form Gaji per Hari -->
+    <div class="mt-4 p-4 bg-white rounded shadow">
+      <h3 class="text-lg font-semibold mb-2">Gaji per Hari per Guru</h3>
+      <div class="mb-4">
+        <label for="guruSatuanSelect" class="block mb-1">Nama Guru:</label>
+        <select id="guruSatuanSelect" class="border p-2 w-full rounded bg-gray-50"></select>
+      </div>
+      <div class="mb-4">
+        <label for="gajiSatuanInput" class="block mb-1">Gaji per Hari:</label>
+        <input type="number" id="gajiSatuanInput" placeholder="Contoh: 25000" class="border p-2 w-full rounded bg-gray-50" />
+      </div>
+      <button onclick="simpanGajiSatuan()" class="bg-blue-500 text-white px-4 py-2 rounded">Simpan Gaji per Hari</button>
+    </div>
+
+    <!-- Filter dan Tombol Proses -->
+    <div class="mt-6">
+      <label for="gajiBulanFilter" class="block mb-1">Pilih Bulan:</label>
+      <input type="month" id="gajiBulanFilter" class="border p-2 rounded bg-gray-50" />
+      <button onclick="prosesSemuaGaji()" class="ml-2 bg-orange-500 text-white px-4 py-2 rounded">Proses Gaji</button>
+    </div>
+
+    <!-- Rekap Tabel -->
+    <h3 class="text-lg font-semibold mt-6 mb-2">Rekap Gaji Guru</h3>
+    <table class="w-full table-auto border border-collapse border-gray-300">
+      <thead>
+        <tr class="bg-gray-100 text-left">
+          <th class="border p-2">Nama</th>
+          <th class="border p-2">Bulan</th>
+          <th class="border p-2">Hadir</th>
+          <th class="border p-2">Terlambat</th>
+          <th class="border p-2">Gaji / Hari</th>
+          <th class="border p-2">Total</th>
+        </tr>
+      </thead>
+      <tbody id="gajiTableBody">
+        <!-- Data rekap gaji -->
+      </tbody>
+    </table>
+  </div>
+</div>
+    </div>
+
+    <script>
+
+        //lokasi sekolah
+        const SCHOOL_COORDINATES = {
+    lat: -7.202052,
+    lng: 113.241723
+};
+
+        const ALLOWED_RADIUS = 2000; // meters
+
+        // Global variables
+        let currentUser = null;
+        let userLocation = null;
+
+        // Utility Functions
+        function showLoading(text = 'Memuat...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+
+        function showMessage(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `mt-4 p-3 rounded-lg text-sm ${
+                type === 'success' ? 'bg-green-100 text-green-700' :
+                type === 'error' ? 'bg-red-100 text-red-700' :
+                type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-blue-100 text-blue-700'
+            }`;
+            element.classList.remove('hidden');
+            setTimeout(() => element.classList.add('hidden'), 5000);
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function formatDateTime(date) {
+            return date.toLocaleString('id-ID', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Location Functions
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation tidak didukung browser ini'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const location = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        userLocation = location;
+                        resolve(location);
+                    },
+                    error => {
+                        let errorMessage = 'Gagal mendapatkan lokasi: ';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage += 'Akses lokasi ditolak';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage += 'Informasi lokasi tidak tersedia';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage += 'Waktu habis saat mengambil lokasi';
+                                break;
+                            default:
+                                errorMessage += 'Error tidak dikenal';
+                                break;
+                        }
+                        reject(new Error(errorMessage));
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+                );
+            });
+        }
+
+        function checkLocationPermission() {
+            getCurrentLocation()
+                .then(location => {
+                    const distance = calculateDistance(
+                        location.lat, location.lng,
+                        SCHOOL_COORDINATES.lat, SCHOOL_COORDINATES.lng
+                    );
+
+                    const statusElement = document.getElementById('locationStatus');
+                    const coordsElement = document.getElementById('coordinatesInfo');
+                    
+                    coordsElement.innerHTML = `
+                        <div class="text-xs">
+                            <div>Lokasi Anda: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</div>
+                            <div>Lokasi Sekolah: ${SCHOOL_COORDINATES.lat}, ${SCHOOL_COORDINATES.lng}</div>
+                            <div>Jarak: ${Math.round(distance)}m | Akurasi: ${Math.round(location.accuracy)}m</div>
+                        </div>
+                    `;
+
+                    if (distance <= ALLOWED_RADIUS) {
+                        statusElement.innerHTML = `
+                            <i class="fas fa-check-circle mr-2 text-green-500"></i>
+                            <span class="text-green-600">Dalam area sekolah (${Math.round(distance)}m dari sekolah)</span>
+                        `;
+                        updateAttendanceButtons(true);
+                    } else {
+                        statusElement.innerHTML = `
+                            <i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+                            <span class="text-red-600">Di luar area sekolah (${Math.round(distance)}m dari sekolah)</span>
+                        `;
+                        updateAttendanceButtons(false);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('locationStatus').innerHTML = `
+                        <i class="fas fa-times-circle mr-2 text-red-500"></i>
+                        <span class="text-red-600">${error.message}</span>
+                    `;
+                    updateAttendanceButtons(false);
+                });
+        }
+
+        function updateAttendanceButtons(allowAttendance) {
+            const checkinBtn = document.getElementById('checkinBtn');
+            const checkoutBtn = document.getElementById('checkoutBtn');
+            
+            if (!allowAttendance) {
+                checkinBtn.disabled = true;
+                checkoutBtn.disabled = true;
+                showMessage('attendanceMessage', 
+                    'Absensi tidak dapat dilakukan karena Anda berada di luar area sekolah', 'error');
+            } else {
+                // Check today's attendance status
+                loadTodayAttendanceStatus();
+            }
+        }
+
+       
+        // Authentication Functions
+        function showLoginScreen() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            
+            // Initialize main app
+            checkLocationPermission();
+            loadTodayAttendanceStatus();
+            
+            // Set default date filters
+            document.getElementById('filterDate').value = formatDate(new Date());
+            document.getElementById('leaveStartDate').value = formatDate(new Date());
+            document.getElementById('leaveEndDate').value = formatDate(new Date());
+        }
+
+        // Attendance Functions
+        function loadTodayAttendanceStatus() {
+    if (!currentUser) return;
+
+    const today = formatDate(new Date());
+    const attendanceRef = database.ref(`attendance/${currentUser.uid}/${today}`);
+    
+    attendanceRef.once('value', snapshot => {
+        const attendance = snapshot.val();
+        const checkinBtn = document.getElementById('checkinBtn');
+        const checkoutBtn = document.getElementById('checkoutBtn');
+        
+        if (attendance) {
+            if (attendance.checkinTime) {
+                document.getElementById('checkinTime').textContent = attendance.checkinTime;
+                
+                // Cek apakah terlambat (setelah 08:10)
+                const checkinDate = new Date(`${today}T${attendance.checkinTime}`);
+                const lateThreshold = new Date(`${today}T08:10:00`);
+                const status = checkinDate > lateThreshold ? 'Terlambat' : 'Tepat waktu';
+                const statusClass = checkinDate > lateThreshold ? 'text-red-500' : 'text-green-500';
+                
+                document.getElementById('checkinStatus').innerHTML = 
+                    `<span class="${statusClass}">${status}</span>`;
+                
+                checkinBtn.disabled = true;
+                checkinBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Sudah Check-in';
+                checkoutBtn.disabled = false;
+            }
+            
+            if (attendance.checkoutTime) {
+                document.getElementById('checkoutTime').textContent = attendance.checkoutTime;
+                checkoutBtn.disabled = true;
+                checkoutBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Sudah Check-out';
+            }
+        } else {
+            // ✅ Tidak atur tombol aktif di sini — cukup biarkan tombol aktif dan validasi dilakukan saat diklik
+            checkinBtn.disabled = false;
+            checkoutBtn.disabled = true;
+        }
+    });
+}
+
+
+        function performAttendance(type) {
+    if (!userLocation) {
+        showMessage('attendanceMessage', 'Lokasi belum terdeteksi', 'error');
+        return;
+    }
+
+    const now = new Date();
+    const jam = now.getHours();
+    const menit = now.getMinutes();
+
+    // Validasi jam check-in
+    // Validasi jam check-in (normal + terlambat)
+let isTerlambat = false;
+
+if (type === 'checkin') {
+    const waktu = jam * 60 + menit; // total menit
+    const batasAwal = 7 * 60 + 30; // 07:30 = 450
+    const batasAkhir = 8 * 60;     // 08:00 = 480
+
+    if (waktu < batasAwal) {
+        showMessage('attendanceMessage', '❌ Check-in belum dibuka. Mulai pukul 07:30', 'error');
+        return;
+    }
+
+    if (waktu > batasAkhir) {
+        isTerlambat = true;
+        // Tidak ditolak — lanjut check-in tapi sebagai terlambat
+    }
+}
+
+    // Validasi jam check-out
+    if (type === 'checkout') {
+        const validCheckOut = (jam > 10) || (jam === 10 && menit >= 30);
+        if (!validCheckOut) {
+            showMessage('attendanceMessage', '❌ Check-out hanya boleh dilakukan setelah jam 10:30', 'error');
+            return;
+        }
+    }
+
+    const distance = calculateDistance(
+        userLocation.lat, userLocation.lng,
+        SCHOOL_COORDINATES.lat, SCHOOL_COORDINATES.lng
+    );
+
+    if (distance > ALLOWED_RADIUS) {
+        showMessage('attendanceMessage', 
+            `Tidak dapat melakukan ${type} karena berada di luar area sekolah (jarak: ${Math.round(distance)}m)`, 'error');
+        return;
+    }
+
+    showLoading(`Melakukan ${type}...`);
+
+    const today = formatDate(now);
+    const timeString = formatTime(now);
+
+    const attendanceData = {};
+    attendanceData[`${type}Time`] = timeString;
+    attendanceData[`${type}Location`] = {
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+        accuracy: userLocation.accuracy
+    };
+    attendanceData[`${type}Distance`] = Math.round(distance);
+    if (type === 'checkin') {
+    attendanceData['status'] = isTerlambat ? 'terlambat' : 'hadir';
+}
+
+    database.ref(`attendance/${currentUser.uid}/${today}`).update(attendanceData)
+        .then(() => {
+    hideLoading();
+
+    const pesan = `${type === 'checkin' ? 'Check-in' : 'Check-out'} berhasil pada ${timeString}`;
+
+    showMessage('attendanceMessage', pesan, 'success');
+    playVoiceNotification(pesan); // ✅ Tambahan suara di sini
+
+    loadTodayAttendanceStatus();
+})
+
+        .catch(error => {
+            hideLoading();
+            showMessage('attendanceMessage', `Gagal melakukan ${type}: ${error.message}`, 'error');
+        });
+}
+
+        // Leave Request Functions
+        function submitLeaveRequest() {
+            const leaveData = {
+                teacherId: currentUser.uid,
+                teacherName: currentUser.displayName || currentUser.email,
+                type: document.getElementById('leaveType').value,
+                startDate: document.getElementById('leaveStartDate').value,
+                endDate: document.getElementById('leaveEndDate').value,
+                reason: document.getElementById('leaveReason').value,
+                submittedAt: new Date().toISOString(),
+                status: 'pending'
+            };
+
+            showLoading('Mengirim pengajuan...');
+            
+            database.ref('leaveRequests').push(leaveData)
+                .then(() => {
+                    hideLoading();
+                    showMessage('leaveMessage', 'Pengajuan izin/sakit berhasil dikirim', 'success');
+                    document.getElementById('leaveForm').reset();
+                    loadMyLeaveRequests();
+                })
+                .catch(error => {
+                    hideLoading();
+                    showMessage('leaveMessage', `Gagal mengirim pengajuan: ${error.message}`, 'error');
+                });
+        }
+
+        function loadMyLeaveRequests() {
+            if (!currentUser) return;
+
+            const leaveRequestsRef = database.ref('leaveRequests');
+            leaveRequestsRef.orderByChild('teacherId').equalTo(currentUser.uid)
+                .once('value', snapshot => {
+                    const container = document.getElementById('myLeaveRequests');
+                    container.innerHTML = '';
+
+                    if (!snapshot.exists()) {
+                        container.innerHTML = '<p class="text-gray-500 text-center py-4">Belum ada pengajuan izin/sakit</p>';
+                        return;
+                    }
+
+                    const requests = [];
+                    snapshot.forEach(child => {
+                        requests.push({ id: child.key, ...child.val() });
+                    });
+
+                    // Sort by submission date (newest first)
+                    requests.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+                    requests.forEach(request => {
+                        const requestDiv = document.createElement('div');
+                        requestDiv.className = 'border rounded-lg p-4 mb-3';
+                        
+                        const statusClass = request.status === 'approved' ? 'text-green-600' :
+                                          request.status === 'rejected' ? 'text-red-600' : 'text-yellow-600';
+                        
+                        const statusText = request.status === 'approved' ? 'Disetujui' :
+                                         request.status === 'rejected' ? 'Ditolak' : 'Menunggu';
+
+                        requestDiv.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-semibold capitalize">${request.type}</span>
+                                <span class="text-sm px-2 py-1 rounded ${statusClass} bg-opacity-10 bg-current">
+                                    ${statusText}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <div>Periode: ${request.startDate} - ${request.endDate}</div>
+                                <div>Dikirim: ${formatDateTime(new Date(request.submittedAt))}</div>
+                            </div>
+                            <div class="text-sm">
+                                <strong>Alasan:</strong> ${request.reason}
+                            </div>
+                        `;
+                        container.appendChild(requestDiv);
+                    });
+                });
+        }
+
+        // Admin Functions
+        function loadAttendanceData(filterDate = null, filterTeacher = null) {
+            const attendanceRef = database.ref('attendance');
+            
+            attendanceRef.once('value', snapshot => {
+                const tableBody = document.getElementById('attendanceTableBody');
+                tableBody.innerHTML = '';
+
+                if (!snapshot.exists()) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Tidak ada data absensi</td></tr>';
+                    return;
+                }
+
+                const attendanceData = [];
+                
+                snapshot.forEach(userSnapshot => {
+                    const userId = userSnapshot.key;
+                    userSnapshot.forEach(dateSnapshot => {
+                        const date = dateSnapshot.key;
+                        const data = dateSnapshot.val();
+                        
+                        // Apply date filter
+                        if (filterDate && date !== filterDate) return;
+                        
+                        attendanceData.push({
+                            userId: userId,
+                            date: date,
+                            ...data
+                        });
+                    });
+                });
+
+                if (attendanceData.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Tidak ada data untuk filter yang dipilih</td></tr>';
+                    return;
+                }
+
+                // Sort by date (newest first)
+                attendanceData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                // Get teacher names
+                const userRef = database.ref('users');
+                userRef.once('value', userSnapshot => {
+                    const users = userSnapshot.val() || {};
+                    
+                    attendanceData.forEach(attendance => {
+                        const teacherName = users[attendance.userId]?.name || 'Unknown User';
+                        
+                        // Apply teacher name filter
+                        if (filterTeacher && !teacherName.toLowerCase().includes(filterTeacher.toLowerCase())) {
+                            return;
+                        }
+
+                        const row = document.createElement('tr');
+                        
+                        // Determine status
+                        let status = 'Hadir';
+                        let statusClass = 'text-green-600';
+                        
+                        if (attendance.checkinTime) {
+                            const checkinDate = new Date(`${attendance.date}T${attendance.checkinTime}`);
+                            const lateThreshold = new Date(`${attendance.date}T07:00:00`);
+                            if (checkinDate > lateThreshold) {
+                                status = 'Terlambat';
+                                statusClass = 'text-yellow-600';
+                            }
+                        }
+                        
+                        if (!attendance.checkoutTime) {
+                            status = 'Belum Check-out';
+                            statusClass = 'text-orange-600';
+                        }
+
+                        row.innerHTML = `
+                            <td class="px-4 py-2 text-sm">${teacherName}</td>
+                            <td class="px-4 py-2 text-sm">${attendance.date}</td>
+                            <td class="px-4 py-2 text-sm">${attendance.checkinTime || '-'}</td>
+                            <td class="px-4 py-2 text-sm">${attendance.checkoutTime || '-'}</td>
+                            <td class="px-4 py-2 text-sm">
+                                <span class="${statusClass}">${status}</span>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                    
+                    if (tableBody.children.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Tidak ada data untuk filter yang dipilih</td></tr>';
+                    }
+                });
+            });
+        }
+
+        function loadLeaveRequests() {
+            const leaveRequestsRef = database.ref('leaveRequests');
+            
+            leaveRequestsRef.once('value', snapshot => {
+                const tableBody = document.getElementById('leaveRequestsTableBody');
+                tableBody.innerHTML = '';
+
+                if (!snapshot.exists()) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Tidak ada permintaan izin/sakit</td></tr>';
+                    return;
+                }
+
+                const requests = [];
+                snapshot.forEach(child => {
+                    requests.push({ id: child.key, ...child.val() });
+                });
+
+                // Sort by submission date (newest first)
+                requests.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+                requests.forEach(request => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-4 py-2 text-sm">${request.teacherName}</td>
+                        <td class="px-4 py-2 text-sm">
+                            <span class="px-2 py-1 rounded text-xs ${
+                                request.type === 'sakit' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                            }">
+                                ${request.type.toUpperCase()}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-sm">${request.startDate} - ${request.endDate}</td>
+                        <td class="px-4 py-2 text-sm max-w-xs truncate" title="${request.reason}">${request.reason}</td>
+                        <td class="px-4 py-2 text-sm">${formatDateTime(new Date(request.submittedAt))}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            });
+        }
+
+        // Tab Management
+        function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        button.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    // Show selected tab content
+    document.getElementById(tabName + 'Content').classList.remove('hidden');
+
+    // Add active class to selected tab
+    const activeTab = document.getElementById(tabName + 'Tab');
+    activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+    activeTab.classList.remove('border-transparent', 'text-gray-500');
+
+    // Load data for specific tabs
+    if (tabName === 'admin') {
+        loadAttendanceData();
+        loadLeaveRequests();
+    } else if (tabName === 'izin') {
+        loadMyLeaveRequests();
+    } else if (tabName === 'gaji') {
+        loadGajiGuru(); // ✅ tampilkan data gaji
+        document.getElementById('gajiGuruTab').classList.remove('hidden'); // ✅ tampilkan kontennya
+    }
+}
+
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auth state observer
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('userName').textContent = user.displayName || user.email;
+                    showMainApp();
+                } else {
+                    currentUser = null;
+                    showLoginScreen();
+                }
+            });
+
+            // Login form
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                
+                showLoading('Masuk...');
+                
+                auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+        saveUserToDatabase(); // ✅ Tambahkan ini agar nama guru disimpan
+        hideLoading();
+    })
+
+                    .catch(error => {
+                        hideLoading();
+                        const errorElement = document.getElementById('loginError');
+                        errorElement.textContent = 'Email atau password salah';
+                        errorElement.classList.remove('hidden');
+                        setTimeout(() => errorElement.classList.add('hidden'), 5000);
+                    });
+            });
+
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                auth.signOut();
+            });
+
+            // Attendance buttons
+            document.getElementById('checkinBtn').addEventListener('click', function() {
+                performAttendance('checkin');
+            });
+
+            document.getElementById('checkoutBtn').addEventListener('click', function() {
+                performAttendance('checkout');
+            });
+
+            // Leave form
+            document.getElementById('leaveForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const startDate = new Date(document.getElementById('leaveStartDate').value);
+                const endDate = new Date(document.getElementById('leaveEndDate').value);
+                
+                if (startDate > endDate) {
+                    showMessage('leaveMessage', 'Tanggal mulai tidak boleh lebih dari tanggal selesai', 'error');
+                    return;
+                }
+                
+                submitLeaveRequest();
+            });
+
+            // Tab buttons
+            document.getElementById('absensiTab').addEventListener('click', () => switchTab('absensi'));
+            document.getElementById('izinTab').addEventListener('click', () => switchTab('izin'));
+            document.getElementById('adminTab').addEventListener('click', () => switchTab('admin'));
+            document.getElementById('gajiTab').addEventListener('click', () => switchTab('gaji'));
+
+            // Admin filters
+            document.getElementById('refreshDataBtn').addEventListener('click', function() {
+                const filterDate = document.getElementById('filterDate').value;
+                const filterTeacher = document.getElementById('filterTeacher').value;
+                loadAttendanceData(filterDate || null, filterTeacher || null);
+            });
+
+            // Filter inputs
+            document.getElementById('filterDate').addEventListener('change', function() {
+                const filterDate = this.value;
+                const filterTeacher = document.getElementById('filterTeacher').value;
+                loadAttendanceData(filterDate || null, filterTeacher || null);
+            });
+
+            document.getElementById('filterTeacher').addEventListener('input', function() {
+                const filterDate = document.getElementById('filterDate').value;
+                const filterTeacher = this.value;
+                loadAttendanceData(filterDate || null, filterTeacher || null);
+            });
+
+            // Location check interval
+            setInterval(() => {
+                if (currentUser && document.getElementById('absensiContent').classList.contains('tab-content') && 
+                    !document.getElementById('absensiContent').classList.contains('hidden')) {
+                    checkLocationPermission();
+                }
+            }, 30000); // Check every 30 seconds
+        });
+        function saveUserToDatabase() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userRef = database.ref('users/' + user.uid);
+
+    userRef.once('value', snapshot => {
+        if (!snapshot.exists()) {
+            const namaInput = document.getElementById('loginNama');
+            const newUser = {
+                name: namaInput ? namaInput.value : user.email,
+                email: user.email,
+                role: "guru" // ✅ Default: guru
+            };
+            userRef.set(newUser);
+        }
+    });
+}
+
+function showMainApp() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('userInfo').classList.remove('hidden');
+
+    const userRef = database.ref('users/' + currentUser.uid);
+    userRef.once('value', snapshot => {
+        const userData = snapshot.val();
+        const role = userData?.role || 'guru';
+
+        // Tampilkan nama di pojok kanan atas
+        document.getElementById('userName').textContent = userData?.name || currentUser.email;
+
+        // Reset tampilan semua tab (hilangkan class hidden)
+        document.getElementById('absensiTab').classList.add('hidden');
+        document.getElementById('izinTab').classList.add('hidden');
+        document.getElementById('adminTab').classList.add('hidden');
+
+        // Tampilkan tab sesuai role
+        if (role === 'admin') {
+            document.getElementById('adminTab').classList.remove('hidden');
+            document.getElementById('gajiTab').classList.remove('hidden');
+            document.getElementById('adminTab').click(); // buka tab admin
+            loadGajiGuru(); 
+            loadGuruDropdown();
+        } else {
+    document.getElementById('absensiTab').classList.remove('hidden');
+    document.getElementById('izinTab').classList.remove('hidden');
+    document.getElementById('absensiTab').click(); // buka tab absensi
+
+    // 🔒 Pastikan user tidak bisa akses fitur gaji
+    document.getElementById('gajiTab').classList.add('hidden');
+    document.getElementById('gajiGuruTab').classList.add('hidden');
+}
+
+
+        // Inisialisasi filter tanggal (opsional)
+        document.getElementById('filterDate').value = formatDate(new Date());
+        document.getElementById('leaveStartDate').value = formatDate(new Date());
+        document.getElementById('leaveEndDate').value = formatDate(new Date());
+    });
+
+    checkLocationPermission();
+    loadTodayAttendanceStatus();
+}
+function simpanGajiSatuan() {
+  const uid = document.getElementById('guruSatuanSelect').value;
+  const gaji = parseInt(document.getElementById('gajiSatuanInput').value);
+
+  database.ref('gaji_satuan/' + uid).set({
+    nama: document.getElementById('guruSatuanSelect').selectedOptions[0].text,
+    gaji_per_hari: gaji
+  }).then(() => {
+    alert("✅ Gaji per hari berhasil disimpan!");
+  });
+}
+
+function hitungGajiOtomatis(uid, bulan) {
+  const absensiRef = database.ref('attendance/' + uid);
+  const gajiSatuanRef = database.ref('gaji_satuan/' + uid);
+
+  let jumlahHadir = 0;
+  let jumlahTerlambat = 0;
+  let totalGaji = 0;
+
+  gajiSatuanRef.once('value').then(gajiSnap => {
+    const gaji_per_hari = gajiSnap.val()?.gaji_per_hari || 0;
+    const nama = gajiSnap.val()?.nama || 'Tidak diketahui';
+
+    absensiRef.once('value', snapshot => {
+      snapshot.forEach(child => {
+        const tanggal = child.key;
+        if (tanggal.startsWith(bulan)) {
+          const data = child.val();
+
+          if (data.checkinTime && data.checkoutDistance) {
+            if (data.status === 'terlambat') {
+              jumlahTerlambat++;
+              totalGaji += gaji_per_hari / 2;
+            } else {
+              jumlahHadir++;
+              totalGaji += gaji_per_hari;
+            }
+          }
+        }
+      });
+
+      database.ref('gaji/' + uid + '/' + bulan).set({
+        nama: nama,
+        gaji_per_hari: gaji_per_hari,
+        hadir: jumlahHadir,
+        terlambat: jumlahTerlambat,
+        total: totalGaji
+      });
+    });
+  });
+}
+
+
+function prosesSemuaGaji() {
+  const bulan = document.getElementById('gajiBulanFilter').value;
+  if (!bulan) return alert("Pilih bulan dulu!");
+
+  database.ref('users').once('value', snapshot => {
+    snapshot.forEach(child => {
+      const uid = child.key;
+      const user = child.val();
+      if (user.role === 'guru') {
+        hitungGajiOtomatis(uid, bulan);
+      }
+    });
+
+    setTimeout(loadGajiGuru, 1000); // Tampilkan setelah diproses
+  });
+}
+
+function loadGajiGuru() {
+  const tbody = document.getElementById('gajiTableBody');
+  tbody.innerHTML = '';
+
+  const bulanFilter = document.getElementById('gajiBulanFilter').value;
+  if (!bulanFilter) return; // Tidak menampilkan apapun jika belum memilih bulan
+
+  database.ref('gaji').once('value', snapshot => {
+    snapshot.forEach(userSnap => {
+      const uid = userSnap.key;
+      const gajiPerUser = userSnap.val();
+
+      if (gajiPerUser[bulanFilter]) {
+        const gaji = gajiPerUser[bulanFilter];
+        const row = document.createElement('tr');
+        row.innerHTML = `
+  <td class="border p-2">${gaji.nama}</td>
+  <td class="border p-2">${bulanFilter}</td>
+  <td class="border p-2">${gaji.hadir || 0}</td>
+  <td class="border p-2 text-yellow-600">${gaji.terlambat || 0}</td>
+  <td class="border p-2">Rp ${gaji.gaji_per_hari?.toLocaleString()}</td>
+  <td class="border p-2 font-bold text-green-600">Rp ${gaji.total?.toLocaleString()}</td>
+`;
+
+        tbody.appendChild(row);
+      }
+    });
+
+    // Jika tidak ada data, tampilkan pesan
+    if (!tbody.hasChildNodes()) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="border p-4 text-center text-gray-500">Tidak ada data gaji untuk bulan ini.</td>
+        </tr>
+      `;
+    }
+  });
+}
+
+function loadGuruDropdown() {
+  const guruSelect = document.getElementById('guruSatuanSelect');
+  if (!guruSelect) return;
+
+  guruSelect.innerHTML = '<option disabled selected>Pilih Guru</option>';
+
+  database.ref('users').once('value', snapshot => {
+    snapshot.forEach(child => {
+      const user = child.val();
+      const uid = child.key;
+
+      if (user.role === 'guru') {
+        const option = document.createElement('option');
+        option.value = uid;
+        option.textContent = user.name || user.email;
+        guruSelect.appendChild(option);
+      }
+    });
+  });
+}
+
+function playVoiceNotification(text) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'id-ID'; // Bahasa Indonesia
+  speechSynthesis.speak(utterance);
+}
+
+    </script>
+</body>
+</html>
