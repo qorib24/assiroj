@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Absensi Guru</title>
+    <link rel="icon" type="image/png" href="YAYASAN.jpg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -68,7 +69,7 @@
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center">
                     <img src="YAYASAN.jpg" alt="Logo Yayasan" class="w-8 h-8 rounded-full mr-3">
-<h1 class="text-white text-xl font-bold">Sistem Absensi Guru</h1>
+<h3 class="text-white text-xl font-bold">Absensi Guru MTS Miftahul Ulum Sek Gersek</h3>
                 </div>
                 <div id="userInfo" class="flex items-center space-x-4 text-white text-sm hidden">
     <span id="userName" class="font-semibold">Loading...</span>
@@ -382,11 +383,11 @@
 
         //lokasi sekolah
         const SCHOOL_COORDINATES = {
-    lat: -7.046575,
-    lng: 113.389041
+    lat: -7.069365,
+    lng: 113.395669
 };
 
-        const ALLOWED_RADIUS = 2000; // meters
+        const ALLOWED_RADIUS = 500; // meters
 
         // Global variables
         let currentUser = null;
@@ -1252,3 +1253,4 @@ function playVoiceNotification(text) {
 </body>
 
 </html>
+
